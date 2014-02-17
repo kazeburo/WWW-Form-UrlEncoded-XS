@@ -1,4 +1,4 @@
-
+[![Build Status](https://travis-ci.org/kazeburo/WWW-Form-UrlEncoded-XS.png?branch=master)](https://travis-ci.org/kazeburo/WWW-Form-UrlEncoded-XS)
 # NAME
 
 WWW::Form::UrlEncoded::XS - XS implementation of parser and builder for application/x-www-form-urlencoded

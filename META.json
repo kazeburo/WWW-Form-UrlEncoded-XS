@@ -55,5 +55,16 @@
       }
    },
    "release_status" : "unstable",
+   "resources" : {
+      "bugtracker" : {
+         "web" : "https://github.com/kazeburo/WWW-Form-UrlEncoded-XS/issues"
+      },
+      "homepage" : "https://github.com/kazeburo/WWW-Form-UrlEncoded-XS",
+      "repository" : {
+         "type" : "git",
+         "url" : "git://github.com/kazeburo/WWW-Form-UrlEncoded-XS.git",
+         "web" : "https://github.com/kazeburo/WWW-Form-UrlEncoded-XS"
+      }
+   },
    "version" : "0.10"
 }
