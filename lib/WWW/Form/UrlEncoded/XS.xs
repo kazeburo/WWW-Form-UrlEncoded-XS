@@ -197,45 +197,103 @@ SV *
 build_urlencoded(...)
   PREINIT:
     int i, j, dlen = 0, key_len, val_len;
-    SV *dst, *av_val;
-    AV *a_val;
+    SV *dst, *st_key, *st_val, *av_val;
+    AV *a_list, *a_val;
+    HV *h_list;
+    HE *h_key;
     char *d, *key_src, *val_src, *key;
     STRLEN key_src_len, val_src_len;
   CODE:
     dst = newSV(0);
     (void)SvUPGRADE(dst, SVt_PV);
     d = SvGROW(dst, 128);
-    for( i=0; i < items; i++ ) {
-        if ( !SvOK(ST(i)) ) {
-            Newx(key,1,char);
-            key_len = 1;
-            key[0] = '=';
-        }
-        else {
-            key_src = (char *)SvPV(ST(i),key_src_len);
-            Newx(key,key_src_len * 3 + 1, char);
-            url_encode_key(key_src, key_src_len, key, &key_len);
-        }
 
-        /* value */
-        i++;
-
-        if ( i == items ) {
-            /* key is last  */
-            key[key_len++] = '&';
-            d = SvGROW(dst, dlen + key_len);
-            memcat(d, &dlen, key, key_len);
+    if ( SvOK(ST(0)) && SvROK(ST(0)) && SvTYPE(SvRV(ST(0))) == SVt_PVAV ) {
+        /* build_urlencoded([a=>z]) */
+       a_list = (AV *)SvRV(ST(0));
+       for (i=0; i<=av_len(a_list); i++) {
+            st_key = *av_fetch(a_list,i,0);
+            if ( !SvOK(st_key) ) {
+                Newx(key,1,char);
+                key_len = 1;
+                key[0] = '=';
+            }
+            else {
+                key_src = (char *)SvPV(st_key,key_src_len);
+                Newx(key,key_src_len * 3 + 1, char);
+                url_encode_key(key_src, key_src_len, key, &key_len);
+            }
+            /* value */
+            i++;
+            if ( i > av_len(a_list) ) {
+                /* key is last  */
+                key[key_len++] = '&';
+                d = SvGROW(dst, dlen + key_len);
+                memcat(d, &dlen, key, key_len);
+            }
+            else {
+                st_val = *av_fetch(a_list,i,0);;
+                if ( !SvOK(st_val) ) {
+                    /* key but last or value is undef */
+                    key[key_len++] = '&';
+                    d = SvGROW(dst, dlen + key_len);
+                    memcat(d, &dlen, key, key_len);
+                }
+                else if ( SvROK(st_val) && SvTYPE(SvRV(st_val)) == SVt_PVAV ) {
+                    /* array ref */
+                    a_val = (AV *)SvRV(st_val);
+                    for (j=0; j<=av_len(a_val); j++) {
+                        av_val = *av_fetch(a_val,j,0);
+                        if ( !SvOK(av_val) ) {
+                            d = SvGROW(dst, dlen + key_len);
+                            memcat(d, &dlen, key, key_len);
+                        }
+                        else {
+                            val_src = (char *)SvPV(av_val,val_src_len);
+                            d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
+                            memcat(d, &dlen, key, key_len);
+                            url_encode_val(d, &dlen, val_src, val_src_len);
+                        }
+                    }
+                }
+                else {
+                    /* sv */
+                    val_src = (char *)SvPV(st_val,val_src_len);
+                    d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
+                    memcat(d, &dlen, key, key_len);
+                    url_encode_val(d, &dlen, val_src, val_src_len);
+                }
+            }
+            Safefree(key);
         }
-        else {
-            if ( !SvOK(ST(i)) ) {
+    }
+    else if ( SvOK(ST(0)) && SvROK(ST(0)) && SvTYPE(SvRV(ST(0))) == SVt_PVHV ) {
+        /* build_urlencoded({a=>z]}) */
+       h_list = (HV *)SvRV(ST(0));
+       hv_iterinit(h_list);
+       while ( (h_key = hv_iternext(h_list)) != NULL ) {
+           st_key = hv_iterkeysv(h_key);
+            if ( !SvOK(st_key) ) {
+                Newx(key,1,char);
+                key_len = 1;
+                key[0] = '=';
+            }
+            else {
+                key_src = (char *)SvPV(st_key,key_src_len);
+                Newx(key,key_src_len * 3 + 1, char);
+                url_encode_key(key_src, key_src_len, key, &key_len);
+            }
+            /* value */
+            st_val = HeVAL(h_key);
+            if ( !SvOK(st_val) ) {
                 /* key but last or value is undef */
                 key[key_len++] = '&';
                 d = SvGROW(dst, dlen + key_len);
                 memcat(d, &dlen, key, key_len);
             }
-            else if ( SvROK(ST(i)) && SvTYPE(SvRV(ST(i))) == SVt_PVAV ) {
+            else if ( SvROK(st_val) && SvTYPE(SvRV(st_val)) == SVt_PVAV ) {
                 /* array ref */
-                a_val = (AV *)SvRV(ST(i));
+                a_val = (AV *)SvRV(st_val);
                 for (j=0; j<=av_len(a_val); j++) {
                     av_val = *av_fetch(a_val,j,0);
                     if ( !SvOK(av_val) ) {
@@ -252,13 +310,70 @@ build_urlencoded(...)
             }
             else {
                 /* sv */
-                val_src = (char *)SvPV(ST(i),val_src_len);
+                val_src = (char *)SvPV(st_val,val_src_len);
                 d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
                 memcat(d, &dlen, key, key_len);
                 url_encode_val(d, &dlen, val_src, val_src_len);
             }
+            Safefree(key);
         }
-        Safefree(key);
+    }
+    else {
+        for( i=0; i < items; i++ ) {
+            st_key = ST(i);
+            if ( !SvOK(st_key) ) {
+                Newx(key,1,char);
+                key_len = 1;
+                key[0] = '=';
+            }
+            else {
+                key_src = (char *)SvPV(st_key,key_src_len);
+                Newx(key,key_src_len * 3 + 1, char);
+                url_encode_key(key_src, key_src_len, key, &key_len);
+            }
+            /* value */
+            i++;
+            if ( i == items ) {
+                /* key is last  */
+                key[key_len++] = '&';
+                d = SvGROW(dst, dlen + key_len);
+                memcat(d, &dlen, key, key_len);
+            }
+            else {
+                st_val = ST(i);
+                if ( !SvOK(st_val) ) {
+                    /* key but last or value is undef */
+                    key[key_len++] = '&';
+                    d = SvGROW(dst, dlen + key_len);
+                    memcat(d, &dlen, key, key_len);
+                }
+                else if ( SvROK(st_val) && SvTYPE(SvRV(st_val)) == SVt_PVAV ) {
+                    /* array ref */
+                    a_val = (AV *)SvRV(st_val);
+                    for (j=0; j<=av_len(a_val); j++) {
+                        av_val = *av_fetch(a_val,j,0);
+                        if ( !SvOK(av_val) ) {
+                            d = SvGROW(dst, dlen + key_len);
+                            memcat(d, &dlen, key, key_len);
+                        }
+                        else {
+                            val_src = (char *)SvPV(av_val,val_src_len);
+                            d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
+                            memcat(d, &dlen, key, key_len);
+                            url_encode_val(d, &dlen, val_src, val_src_len);
+                        }
+                    }
+                }
+                else {
+                    /* sv */
+                    val_src = (char *)SvPV(st_val,val_src_len);
+                    d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
+                    memcat(d, &dlen, key, key_len);
+                    url_encode_val(d, &dlen, val_src, val_src_len);
+                }
+            }
+            Safefree(key);
+        }
     }
 
     if ( dlen > 0 && d[dlen-1] == '&' ) {
