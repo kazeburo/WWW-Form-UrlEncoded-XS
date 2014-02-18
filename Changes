@@ -2,6 +2,10 @@ Revision history for Perl extension WWW-Form-UrlEncoded-XS
 
 {{$NEXT}}
 
+0.13 2014-02-18T07:56:41Z
+
+    - supports a delimiter parameter
+
 0.12 2014-02-18T03:11:35Z
 
     - build_urlencoded supports hashref and arrayref arguments
