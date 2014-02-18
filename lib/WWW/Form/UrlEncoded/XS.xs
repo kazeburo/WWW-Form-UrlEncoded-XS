@@ -96,7 +96,7 @@ url_encode_key(const char *src, int src_len, char *d, int *key_len) {
 
 static
 void
-url_encode_val(char * dst, int *dst_len, const char * src, int src_len ) {
+url_encode_val(char * dst, int *dst_len, const char * src, int src_len, char * delim, int delim_len ) {
     int i;
     int dlen = *dst_len;
     U8 s;
@@ -115,7 +115,9 @@ url_encode_val(char * dst, int *dst_len, const char * src, int src_len ) {
             dst[dlen++] = s;
         }
     }
-    dst[dlen++] = '&';
+    for ( i=0; i<delim_len; i++ ) {
+        dst[dlen++] = delim[i];
+    }
     *dst_len = dlen;
 }
 
@@ -128,6 +130,16 @@ memcat( char * dst, int *dst_len, const char * src, int src_len ) {
         dst[dlen++] = src[i];
     }
     *dst_len = dlen;
+}
+
+static
+void
+memcopyset( char * dst, int dst_len, const char * src, int src_len ) {
+    int i;
+    int dlen = dst_len;
+    for ( i=0; i<src_len; i++) {
+        dst[dlen++] = src[i];
+    }
 }
 
 MODULE = WWW::Form::UrlEncoded::XS    PACKAGE = WWW::Form::UrlEncoded::XS
@@ -201,15 +213,25 @@ build_urlencoded(...)
     AV *a_list, *a_val;
     HV *h_list;
     HE *h_key;
-    char *d, *key_src, *val_src, *key;
-    STRLEN key_src_len, val_src_len;
+    char *d, *key_src, *val_src, *key, *delim, *delim_val;
+    STRLEN key_src_len, val_src_len, delim_len;
   CODE:
     dst = newSV(0);
     (void)SvUPGRADE(dst, SVt_PV);
     d = SvGROW(dst, 128);
 
+    Newx(delim, 4, char);
+    delim[0] = '&';
+    delim_len = 1;
+
     if ( SvOK(ST(0)) && SvROK(ST(0)) && SvTYPE(SvRV(ST(0))) == SVt_PVAV ) {
         /* build_urlencoded([a=>z]) */
+       if ( items > 1 && SvOK(ST(1)) ) {
+           delim_val = (char *)SvPV(ST(1),delim_len);
+           Renew(delim, delim_len ,char);
+           memcopyset(delim, 0, delim_val, delim_len);
+       }
+
        a_list = (AV *)SvRV(ST(0));
        for (i=0; i<=av_len(a_list); i++) {
             st_key = *av_fetch(a_list,i,0);
@@ -227,17 +249,17 @@ build_urlencoded(...)
             i++;
             if ( i > av_len(a_list) ) {
                 /* key is last  */
-                key[key_len++] = '&';
-                d = SvGROW(dst, dlen + key_len);
+                d = SvGROW(dst, dlen + key_len + delim_len);
                 memcat(d, &dlen, key, key_len);
+                memcat(d, &dlen, delim, delim_len);
             }
             else {
                 st_val = *av_fetch(a_list,i,0);;
                 if ( !SvOK(st_val) ) {
                     /* key but last or value is undef */
-                    key[key_len++] = '&';
-                    d = SvGROW(dst, dlen + key_len);
+                    d = SvGROW(dst, dlen + key_len + delim_len);
                     memcat(d, &dlen, key, key_len);
+                    memcat(d, &dlen, delim, delim_len);
                 }
                 else if ( SvROK(st_val) && SvTYPE(SvRV(st_val)) == SVt_PVAV ) {
                     /* array ref */
@@ -250,18 +272,18 @@ build_urlencoded(...)
                         }
                         else {
                             val_src = (char *)SvPV(av_val,val_src_len);
-                            d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
+                            d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
                             memcat(d, &dlen, key, key_len);
-                            url_encode_val(d, &dlen, val_src, val_src_len);
+                            url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
                         }
                     }
                 }
                 else {
                     /* sv */
                     val_src = (char *)SvPV(st_val,val_src_len);
-                    d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
+                    d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
                     memcat(d, &dlen, key, key_len);
-                    url_encode_val(d, &dlen, val_src, val_src_len);
+                    url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
                 }
             }
             Safefree(key);
@@ -269,6 +291,11 @@ build_urlencoded(...)
     }
     else if ( SvOK(ST(0)) && SvROK(ST(0)) && SvTYPE(SvRV(ST(0))) == SVt_PVHV ) {
         /* build_urlencoded({a=>z]}) */
+       if ( items > 1 && SvOK(ST(1)) ) {
+           delim_val = (char *)SvPV(ST(1),delim_len);
+           Renew(delim, delim_len ,char);
+           memcopyset(delim, 0, delim_val, delim_len);
+       }
        h_list = (HV *)SvRV(ST(0));
        hv_iterinit(h_list);
        while ( (h_key = hv_iternext(h_list)) != NULL ) {
@@ -287,9 +314,9 @@ build_urlencoded(...)
             st_val = HeVAL(h_key);
             if ( !SvOK(st_val) ) {
                 /* key but last or value is undef */
-                key[key_len++] = '&';
-                d = SvGROW(dst, dlen + key_len);
+                d = SvGROW(dst, dlen + key_len + delim_len);
                 memcat(d, &dlen, key, key_len);
+                memcat(d, &dlen, delim, delim_len);
             }
             else if ( SvROK(st_val) && SvTYPE(SvRV(st_val)) == SVt_PVAV ) {
                 /* array ref */
@@ -302,23 +329,29 @@ build_urlencoded(...)
                     }
                     else {
                         val_src = (char *)SvPV(av_val,val_src_len);
-                        d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
+                        d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
                         memcat(d, &dlen, key, key_len);
-                        url_encode_val(d, &dlen, val_src, val_src_len);
+                        url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
                     }
                 }
             }
             else {
                 /* sv */
                 val_src = (char *)SvPV(st_val,val_src_len);
-                d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
+                d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
                 memcat(d, &dlen, key, key_len);
-                url_encode_val(d, &dlen, val_src, val_src_len);
+                url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
             }
             Safefree(key);
         }
     }
     else {
+        if ( items > 2 && items % 2 == 1 ) {
+            delim_val = (char *)SvPV(ST(items-1),delim_len);
+            Renew(delim, delim_len ,char);
+            memcopyset(delim, 0, delim_val, delim_len);
+            items--;
+        }
         for( i=0; i < items; i++ ) {
             st_key = ST(i);
             if ( !SvOK(st_key) ) {
@@ -333,19 +366,19 @@ build_urlencoded(...)
             }
             /* value */
             i++;
-            if ( i == items ) {
+            if ( i ==  items ) {
                 /* key is last  */
-                key[key_len++] = '&';
-                d = SvGROW(dst, dlen + key_len);
+                d = SvGROW(dst, dlen + key_len + delim_len);
                 memcat(d, &dlen, key, key_len);
+                memcat(d, &dlen, delim, delim_len);
             }
             else {
                 st_val = ST(i);
                 if ( !SvOK(st_val) ) {
                     /* key but last or value is undef */
-                    key[key_len++] = '&';
-                    d = SvGROW(dst, dlen + key_len);
+                    d = SvGROW(dst, dlen + key_len + delim_len);
                     memcat(d, &dlen, key, key_len);
+                    memcat(d, &dlen, delim, delim_len);
                 }
                 else if ( SvROK(st_val) && SvTYPE(SvRV(st_val)) == SVt_PVAV ) {
                     /* array ref */
@@ -358,27 +391,29 @@ build_urlencoded(...)
                         }
                         else {
                             val_src = (char *)SvPV(av_val,val_src_len);
-                            d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
+                            d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
                             memcat(d, &dlen, key, key_len);
-                            url_encode_val(d, &dlen, val_src, val_src_len);
+                            url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
                         }
                     }
                 }
                 else {
                     /* sv */
                     val_src = (char *)SvPV(st_val,val_src_len);
-                    d = SvGROW(dst, dlen + key_len + (val_src_len*3) + 1);
+                    d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
                     memcat(d, &dlen, key, key_len);
-                    url_encode_val(d, &dlen, val_src, val_src_len);
+                    url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
                 }
             }
             Safefree(key);
         }
     }
 
-    if ( dlen > 0 && d[dlen-1] == '&' ) {
-      dlen = dlen - 1;
+    if ( dlen > delim_len ) {
+      dlen = dlen - delim_len;
     }
+
+    Safefree(delim);
     SvCUR_set(dst, dlen);
     SvPOK_only(dst);
     RETVAL = dst;
