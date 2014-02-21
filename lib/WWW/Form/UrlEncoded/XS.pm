@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw/Exporter/;
 
-our $VERSION = "0.14";
+our $VERSION = "0.15";
 our @EXPORT_OK = qw/parse_urlencoded build_urlencoded build_urlencoded_utf8/;
 
 use XSLoader;
