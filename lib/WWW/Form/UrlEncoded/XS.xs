@@ -142,6 +142,23 @@ memcopyset( char * dst, int dst_len, const char * src, int src_len ) {
     }
 }
 
+static
+char *
+svpv2char(pTHX_ SV *string, STRLEN *len, int utf8) {
+    char *str;
+    STRLEN str_len;
+    if ( utf8 == 1 ) {
+        SvGETMAGIC(string);
+        if (!SvUTF8(string)) {
+            string = sv_mortalcopy(string);
+            sv_utf8_encode(string);
+        }
+    }
+    str = (char *)SvPV(string,str_len);
+    *len = str_len;
+    return str;
+}
+
 MODULE = WWW::Form::UrlEncoded::XS    PACKAGE = WWW::Form::UrlEncoded::XS
 
 PROTOTYPES: DISABLE
@@ -207,19 +224,19 @@ parse_urlencoded(qs)
 
 SV *
 build_urlencoded(...)
+  ALIAS:
+    WWW::Form::UrlEncoded::XS::build_urlencoded = 0
+    WWW::Form::UrlEncoded::XS::build_urlencoded_utf8 = 1
   PREINIT:
     int i, j, dlen = 0, key_len, val_len;
-    SV *dst, *st_key, *st_val, *av_val;
+    SV *st_key, *st_val, *av_val;
     AV *a_list, *a_val;
     HV *h_list;
     HE *h_key;
     char *d, *key_src, *val_src, *key, *delim, *delim_val;
     STRLEN key_src_len, val_src_len, delim_len;
   CODE:
-    dst = newSV(0);
-    (void)SvUPGRADE(dst, SVt_PV);
-    d = SvGROW(dst, 128);
-
+    Newx(d,128,char);
     Newx(delim, 4, char);
     delim[0] = '&';
     delim_len = 1;
@@ -227,7 +244,7 @@ build_urlencoded(...)
     if ( SvOK(ST(0)) && SvROK(ST(0)) && SvTYPE(SvRV(ST(0))) == SVt_PVAV ) {
         /* build_urlencoded([a=>z]) */
        if ( items > 1 && SvOK(ST(1)) ) {
-           delim_val = (char *)SvPV(ST(1),delim_len);
+           delim_val = svpv2char(aTHX_ ST(1), &delim_len, ix);
            Renew(delim, delim_len ,char);
            memcopyset(delim, 0, delim_val, delim_len);
        }
@@ -241,7 +258,7 @@ build_urlencoded(...)
                 key[0] = '=';
             }
             else {
-                key_src = (char *)SvPV(st_key,key_src_len);
+                key_src = svpv2char(aTHX_ st_key, &key_src_len, ix);
                 Newx(key,key_src_len * 3 + 1, char);
                 url_encode_key(key_src, key_src_len, key, &key_len);
             }
@@ -249,7 +266,7 @@ build_urlencoded(...)
             i++;
             if ( i > av_len(a_list) ) {
                 /* key is last  */
-                d = SvGROW(dst, dlen + key_len + delim_len);
+                Renew(d, dlen + key_len + delim_len, char);
                 memcat(d, &dlen, key, key_len);
                 memcat(d, &dlen, delim, delim_len);
             }
@@ -257,7 +274,7 @@ build_urlencoded(...)
                 st_val = *av_fetch(a_list,i,0);;
                 if ( !SvOK(st_val) ) {
                     /* key but last or value is undef */
-                    d = SvGROW(dst, dlen + key_len + delim_len);
+                    Renew(d, dlen + key_len + delim_len, char);
                     memcat(d, &dlen, key, key_len);
                     memcat(d, &dlen, delim, delim_len);
                 }
@@ -267,12 +284,12 @@ build_urlencoded(...)
                     for (j=0; j<=av_len(a_val); j++) {
                         av_val = *av_fetch(a_val,j,0);
                         if ( !SvOK(av_val) ) {
-                            d = SvGROW(dst, dlen + key_len);
+                            Renew(d, dlen + key_len, char);
                             memcat(d, &dlen, key, key_len);
                         }
                         else {
-                            val_src = (char *)SvPV(av_val,val_src_len);
-                            d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
+                            val_src = svpv2char(aTHX_ av_val, &val_src_len, ix);
+                            Renew(d, dlen + key_len + (val_src_len*3) + delim_len + 1, char);
                             memcat(d, &dlen, key, key_len);
                             url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
                         }
@@ -280,8 +297,8 @@ build_urlencoded(...)
                 }
                 else {
                     /* sv */
-                    val_src = (char *)SvPV(st_val,val_src_len);
-                    d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
+                    val_src = svpv2char(aTHX_ st_val, &val_src_len, ix);
+                    Renew(d, dlen + key_len + (val_src_len*3) + delim_len + 1, char);
                     memcat(d, &dlen, key, key_len);
                     url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
                 }
@@ -292,7 +309,7 @@ build_urlencoded(...)
     else if ( SvOK(ST(0)) && SvROK(ST(0)) && SvTYPE(SvRV(ST(0))) == SVt_PVHV ) {
         /* build_urlencoded({a=>z]}) */
        if ( items > 1 && SvOK(ST(1)) ) {
-           delim_val = (char *)SvPV(ST(1),delim_len);
+           delim_val = svpv2char(aTHX_ ST(1), &delim_len, ix);
            Renew(delim, delim_len ,char);
            memcopyset(delim, 0, delim_val, delim_len);
        }
@@ -306,7 +323,7 @@ build_urlencoded(...)
                 key[0] = '=';
             }
             else {
-                key_src = (char *)SvPV(st_key,key_src_len);
+                key_src = svpv2char(aTHX_ st_key, &key_src_len, ix);
                 Newx(key,key_src_len * 3 + 1, char);
                 url_encode_key(key_src, key_src_len, key, &key_len);
             }
@@ -314,7 +331,7 @@ build_urlencoded(...)
             st_val = HeVAL(h_key);
             if ( !SvOK(st_val) ) {
                 /* key but last or value is undef */
-                d = SvGROW(dst, dlen + key_len + delim_len);
+                Renew(d, dlen + key_len + delim_len, char);
                 memcat(d, &dlen, key, key_len);
                 memcat(d, &dlen, delim, delim_len);
             }
@@ -324,12 +341,12 @@ build_urlencoded(...)
                 for (j=0; j<=av_len(a_val); j++) {
                     av_val = *av_fetch(a_val,j,0);
                     if ( !SvOK(av_val) ) {
-                        d = SvGROW(dst, dlen + key_len);
+                        Renew(d, dlen + key_len, char);
                         memcat(d, &dlen, key, key_len);
                     }
                     else {
-                        val_src = (char *)SvPV(av_val,val_src_len);
-                        d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
+                        val_src = svpv2char(aTHX_ av_val, &val_src_len, ix);
+                        Renew(d, dlen + key_len + (val_src_len*3) + delim_len + 1, char);
                         memcat(d, &dlen, key, key_len);
                         url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
                     }
@@ -337,8 +354,8 @@ build_urlencoded(...)
             }
             else {
                 /* sv */
-                val_src = (char *)SvPV(st_val,val_src_len);
-                d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
+                val_src = svpv2char(aTHX_ st_val, &val_src_len, ix);
+                Renew(d, dlen + key_len + (val_src_len*3) + delim_len + 1, char);
                 memcat(d, &dlen, key, key_len);
                 url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
             }
@@ -347,10 +364,10 @@ build_urlencoded(...)
     }
     else {
         if ( items > 2 && items % 2 == 1 ) {
-            delim_val = (char *)SvPV(ST(items-1),delim_len);
-            Renew(delim, delim_len ,char);
-            memcopyset(delim, 0, delim_val, delim_len);
-            items--;
+           delim_val = svpv2char(aTHX_ ST(items-1), &delim_len, ix);
+           Renew(delim, delim_len ,char);
+           memcopyset(delim, 0, delim_val, delim_len);
+           items--;
         }
         for( i=0; i < items; i++ ) {
             st_key = ST(i);
@@ -360,7 +377,7 @@ build_urlencoded(...)
                 key[0] = '=';
             }
             else {
-                key_src = (char *)SvPV(st_key,key_src_len);
+                key_src = svpv2char(aTHX_ st_key, &key_src_len, ix);
                 Newx(key,key_src_len * 3 + 1, char);
                 url_encode_key(key_src, key_src_len, key, &key_len);
             }
@@ -368,7 +385,7 @@ build_urlencoded(...)
             i++;
             if ( i ==  items ) {
                 /* key is last  */
-                d = SvGROW(dst, dlen + key_len + delim_len);
+                Renew(d, dlen + key_len + delim_len, char);
                 memcat(d, &dlen, key, key_len);
                 memcat(d, &dlen, delim, delim_len);
             }
@@ -376,7 +393,7 @@ build_urlencoded(...)
                 st_val = ST(i);
                 if ( !SvOK(st_val) ) {
                     /* key but last or value is undef */
-                    d = SvGROW(dst, dlen + key_len + delim_len);
+                    Renew(d, dlen + key_len + delim_len, char);
                     memcat(d, &dlen, key, key_len);
                     memcat(d, &dlen, delim, delim_len);
                 }
@@ -386,12 +403,12 @@ build_urlencoded(...)
                     for (j=0; j<=av_len(a_val); j++) {
                         av_val = *av_fetch(a_val,j,0);
                         if ( !SvOK(av_val) ) {
-                            d = SvGROW(dst, dlen + key_len);
+                            Renew(d, dlen + key_len, char);
                             memcat(d, &dlen, key, key_len);
                         }
                         else {
-                            val_src = (char *)SvPV(av_val,val_src_len);
-                            d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
+                            val_src = svpv2char(aTHX_ av_val, &val_src_len, ix);
+                            Renew(d, dlen + key_len + (val_src_len*3) + delim_len + 1, char);
                             memcat(d, &dlen, key, key_len);
                             url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
                         }
@@ -399,8 +416,8 @@ build_urlencoded(...)
                 }
                 else {
                     /* sv */
-                    val_src = (char *)SvPV(st_val,val_src_len);
-                    d = SvGROW(dst, dlen + key_len + (val_src_len*3) + delim_len + 1);
+                    val_src = svpv2char(aTHX_ st_val, &val_src_len, ix);
+                    Renew(d, dlen + key_len + (val_src_len*3) + delim_len + 1, char);
                     memcat(d, &dlen, key, key_len);
                     url_encode_val(d, &dlen, val_src, val_src_len, delim, delim_len);
                 }
@@ -413,10 +430,9 @@ build_urlencoded(...)
       dlen = dlen - delim_len;
     }
 
+    RETVAL = newSVpv(d, dlen);
     Safefree(delim);
-    SvCUR_set(dst, dlen);
-    SvPOK_only(dst);
-    RETVAL = dst;
+    Safefree(d);
   OUTPUT:
     RETVAL
 

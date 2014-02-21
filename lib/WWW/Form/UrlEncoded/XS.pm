@@ -6,7 +6,7 @@ use warnings;
 use base qw/Exporter/;
 
 our $VERSION = "0.13";
-our @EXPORT_OK = qw/parse_urlencoded build_urlencoded/;
+our @EXPORT_OK = qw/parse_urlencoded build_urlencoded build_urlencoded_utf8/;
 
 use XSLoader;
 XSLoader::load(__PACKAGE__, $VERSION);
