@@ -430,7 +430,8 @@ build_urlencoded(...)
       dlen = dlen - delim_len;
     }
 
-    RETVAL = newSVpv(d, dlen);
+    RETVAL = newSVpvn(d, dlen);
+    SvPOK_only(RETVAL);
     Safefree(delim);
     Safefree(d);
   OUTPUT:
