@@ -44,7 +44,7 @@
       "runtime" : {
          "requires" : {
             "Exporter" : "0",
-            "perl" : "5.008004"
+            "perl" : "5.008001"
          }
       },
       "test" : {

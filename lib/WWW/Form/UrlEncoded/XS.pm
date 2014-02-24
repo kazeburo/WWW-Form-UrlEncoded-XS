@@ -1,6 +1,6 @@
 package WWW::Form::UrlEncoded::XS;
 
-use 5.008004;
+use 5.008001;
 use strict;
 use warnings;
 use base qw/Exporter/;
