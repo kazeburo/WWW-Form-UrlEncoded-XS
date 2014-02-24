@@ -180,9 +180,7 @@ parse_urlencoded(qs)
     int i, prev_s=0, f;
     STRLEN src_len;
   PPCODE:
-    if ( !SvOK(qs) ) {
-    }
-    else {
+    if ( SvOK(qs) ) {
         src = (char *)SvPV(qs,src_len);
         prev = src;
         for ( i=0; i<src_len; i++ ) {
@@ -230,6 +228,64 @@ parse_urlencoded(qs)
 
     }
 
+void
+parse_urlencoded_arrayref(qs)
+    SV *qs
+  PREINIT:
+    char *src, *prev, *p;
+    int i, prev_s=0, f;
+    AV *av;
+    STRLEN src_len;
+  PPCODE:
+    av = newAV();
+    ST(0) = sv_2mortal(newRV_noinc((SV *)av));
+    if ( SvOK(qs) ) {
+        src = (char *)SvPV(qs,src_len);
+        prev = src;
+        for ( i=0; i<src_len; i++ ) {
+            if ( src[i] == '&' || src[i] == ';') {
+                if ( prev[0] == ' ' ) {
+                    prev++;
+                    prev_s++;
+                }
+                p = memchr(prev, '=', i - prev_s);
+                if ( p == NULL ) {
+                    f = 0;
+                    p = &prev[i-prev_s];
+                }
+                else {
+                    f = 1;
+                }
+                av_push(av, url_decode(aTHX_ src, prev_s, p - prev + prev_s ));
+                av_push(av, url_decode(aTHX_ src, p - prev + prev_s + f, i ));
+                prev = &src[i+1];
+                prev_s = i + 1;
+            }
+        }
+
+        if ( i > prev_s ) {
+            if ( prev[0] == ' ' ) {
+                prev++;
+                prev_s++;
+            }
+            p = memchr(prev, '=', i - prev_s);
+            if ( p == NULL ) {
+                f = 0;
+                p = &prev[i-prev_s];
+            }
+            else {
+                f = 1;
+            }
+            av_push(av, url_decode(aTHX_ src, prev_s, p - prev + prev_s ));
+            av_push(av, url_decode(aTHX_ src, p - prev + prev_s + f, i ));
+        }
+
+        if ( src[src_len-1] == '&' || src[src_len-1] == ';' ) {
+            av_push(av, newSVpv("",0));
+            av_push(av,newSVpv("",0));
+        }
+    }
+    XSRETURN(1);
 
 SV *
 build_urlencoded(...)
