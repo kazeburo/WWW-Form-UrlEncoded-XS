@@ -32,6 +32,7 @@ while ( @data ) {
     is( build_urlencoded(@$data), $test, JSON::encode_json($data));
 }
 
+is( build_urlencoded([ foo => "\xE5", bar => "\x{263A}" ]), 'foo=%E5&bar=%E2%98%BA'); 
 is( build_urlencoded_utf8([ foo => "\xE5", bar => "\x{263A}" ]), 'foo=%C3%A5&bar=%E2%98%BA'); 
 is( build_urlencoded_utf8([ "\xE5" => "foo", "\x{263A}" => "bar" ]), '%C3%A5=foo&%E2%98%BA=bar'); 
 is( build_urlencoded_utf8([ foo => "\x{263A}", bar => "\x{263A}" ],"\xE5"), 'foo=%E2%98%BAåbar=%E2%98%BA'); 
