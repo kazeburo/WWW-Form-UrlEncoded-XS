@@ -2,6 +2,10 @@ Revision history for Perl extension WWW-Form-UrlEncoded-XS
 
 {{$NEXT}}
 
+0.20 2014-11-18T08:22:47Z
+
+   - add 0 terminate
+
 0.19 2014-04-30T03:05:15Z
 
    - add test about \xE5. it must becom %E5 with build_urlencoded
