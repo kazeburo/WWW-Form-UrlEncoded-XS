@@ -65,8 +65,8 @@ url_decode(pTHX_ const char *src, int start, int end) {
             d[dlen++] = src[i];
         }
     }
-
     SvCUR_set(dst, dlen);
+    *SvEND(dst) = '\0';
     SvPOK_only(dst);
     return dst;
 }
