@@ -408,6 +408,7 @@ build_urlencoded(...)
                     if ( !SvOK(av_val) ) {
                         renewmem(aTHX_ &d, &dsize, dlen + key_len);
                         memcat(d, &dlen, key, key_len);
+                        memcat(d, &dlen, delim, delim_len);
                     }
                     else {
                         val_src = svpv2char(aTHX_ av_val, &val_src_len, ix);
