@@ -2,6 +2,11 @@ Revision history for Perl extension WWW-Form-UrlEncoded-XS
 
 {{$NEXT}}
 
+0.22 2015-06-12T05:32:35Z
+
+   - no changes. Newer version required by W-F-UE::PP
+   - switch to Module::Build::Tiny
+
 0.21 2015-04-28T17:03:29Z
 
    - bugfix. the delimiter is missed after undefined values in some case #1
