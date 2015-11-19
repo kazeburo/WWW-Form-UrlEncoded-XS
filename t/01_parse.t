@@ -1,8 +1,11 @@
 use strict;
 use warnings;
 use Test::More;
-use WWW::Form::UrlEncoded::XS qw/parse_urlencoded/;
+use WWW::Form::UrlEncoded::XS qw/parse_urlencoded parse_urlencoded_arrayref/;
 use JSON;
+
+is_deeply([parse_urlencoded(undef)], []);
+is_deeply(parse_urlencoded_arrayref(undef), []);
 
 while (<DATA>) {
     chomp;
@@ -11,6 +14,9 @@ while (<DATA>) {
     $s =~ s/'//g;
     my @param = parse_urlencoded($s);
     is JSON::encode_json(\@param), $t, $s;
+    my $param = parse_urlencoded_arrayref($s);
+    is JSON::encode_json($param), $t, $s;
+
 }
 
 done_testing();
