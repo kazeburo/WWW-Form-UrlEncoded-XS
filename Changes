@@ -2,6 +2,10 @@ Revision history for Perl extension WWW-Form-UrlEncoded-XS
 
 {{$NEXT}}
 
+0.24 2017-02-28T06:16:53Z
+
+   - updated with Minil 3
+
 0.23 2015-11-19T00:27:20Z
 
    - add test cases parsing undef
