@@ -65,7 +65,7 @@
          "web" : "https://github.com/kazeburo/WWW-Form-UrlEncoded-XS"
       }
    },
-   "version" : "0.24",
+   "version" : "0.25",
    "x_serialization_backend" : "JSON::PP version 2.27300_01",
    "x_static_install" : 0
 }
